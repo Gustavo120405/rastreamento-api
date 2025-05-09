@@ -7,7 +7,7 @@ import datetime
 app = FastAPI()
 
 # ⚠️ Substitua abaixo pelos seus dados reais
-PIXEL_ID = "61574933352503"
+PIXEL_ID = "1837485547102159"
 ACCESS_TOKEN = "EAAYhO7ITkRQBOwQdf6B0FONgfHlfoS1cSYbqAkuVVl0badqUqkQy5HO4d3WMywfU5Q8JeKiFTqfWXif11JjkdWEDHXPBBB8JTBS6JAc0NuBUFfuZCJYsUg3PbaPOdgBrn8ZB6zn2ZCg53Hfa1ezHe9Cq8tAtZAoPOyzrkyxK5ZCZBm3ZAU4hBGiWbZAZCf19EPJ3dMgZDZD"
 
 # Função para aplicar SHA256
