@@ -1,48 +1,47 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
-import hashlib
 import requests
-import datetime
+import hashlib
+import os
 
 app = FastAPI()
 
-# ⚠️ Substitua abaixo pelos seus dados reais
 PIXEL_ID = "1837485547102159"
 ACCESS_TOKEN = "EAAYhO7ITkRQBOwQdf6B0FONgfHlfoS1cSYbqAkuVVl0badqUqkQy5HO4d3WMywfU5Q8JeKiFTqfWXif11JjkdWEDHXPBBB8JTBS6JAc0NuBUFfuZCJYsUg3PbaPOdgBrn8ZB6zn2ZCg53Hfa1ezHe9Cq8tAtZAoPOyzrkyxK5ZCZBm3ZAU4hBGiWbZAZCf19EPJ3dMgZDZD"
 
-# Função para aplicar SHA256
-def hash_sha256(value: str) -> str:
+class EventData(BaseModel):
+    event: str
+    email: str = ""
+    name: str = ""
+
+def sha256_hash(value: str) -> str:
     return hashlib.sha256(value.strip().lower().encode()).hexdigest()
 
-# Função que envia evento para a API do Meta
-def enviar_para_facebook(nome: str, email: str, evento: str = "Lead"):
-    url = f"https://graph.facebook.com/v18.0/{PIXEL_ID}/events?access_token={ACCESS_TOKEN}"
-    
+@app.post("/event")
+async def receive_event(data: EventData, request: Request):
+    client_ip = request.client.host
+    user_agent = request.headers.get('user-agent', '')
+
     payload = {
         "data": [
             {
-                "event_name": evento,
-                "event_time": int(datetime.datetime.now().timestamp()),
-                "action_source": "website",
+                "event_name": data.event,
+                "event_time": int(requests.get("https://worldtimeapi.org/api/ip").json()["unixtime"]),
+                "event_source_url": str(request.headers.get("referer", "")),
                 "user_data": {
-                    "em": [hash_sha256(email)],
-                    "fn": [hash_sha256(nome)]
+                    "em": [sha256_hash(data.email)] if data.email else [],
+                    "fn": [sha256_hash(data.name.split()[0])] if data.name else [],
+                    "ln": [sha256_hash(data.name.split()[-1])] if data.name and " " in data.name else [],
+                    "client_ip_address": client_ip,
+                    "client_user_agent": user_agent
                 }
             }
         ]
     }
 
-    response = requests.post(url, json=payload)
-    print(f"[Facebook CAPI] {response.status_code}: {response.text}")
-    return response.status_code, response.text
+    response = requests.post(
+        f"https://graph.facebook.com/v18.0/{PIXEL_ID}/events?access_token={ACCESS_TOKEN}",
+        json=payload
+    )
 
-# Modelo de entrada via POST
-class EventData(BaseModel):
-    event: str
-    email: str
-    name: str
-
-@app.post("/event")
-async def receive_event(data: EventData):
-    status, resposta = enviar_para_facebook(data.name, data.email, data.event)
-    return {"status": status, "meta_response": resposta}
+    return {"status": response.status_code, "meta_response": response.text}
