@@ -1,3 +1,13 @@
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ou especifique ["https://glicopharma.shop"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from typing import Optional
