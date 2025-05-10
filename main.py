@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 import requests
 import hashlib
-import time  # <- você esqueceu de importar isso
+import time
 
 app = FastAPI()
 
@@ -26,6 +26,11 @@ class EventData(BaseModel):
     event: str
     email: Optional[str] = None
     name: Optional[str] = None
+    utm_source: Optional[str] = None
+    utm_medium: Optional[str] = None
+    utm_campaign: Optional[str] = None
+    utm_term: Optional[str] = None
+    utm_content: Optional[str] = None
 
 # Função de hash SHA-256
 def hash_sha256(data: Optional[str]) -> Optional[str]:
@@ -38,6 +43,8 @@ def hash_sha256(data: Optional[str]) -> Optional[str]:
 async def receive_event(event: EventData, request: Request):
     client_ip = request.client.host
     user_agent = request.headers.get("user-agent", "")
+    first_name = event.name.split()[0] if event.name else None
+    last_name = event.name.split()[-1] if event.name else None
 
     payload = {
         "data": [
@@ -48,10 +55,17 @@ async def receive_event(event: EventData, request: Request):
                 "event_source_url": str(request.url),
                 "user_data": {
                     "em": [hash_sha256(event.email)],
-                    "fn": [hash_sha256(event.name.split()[0]) if event.name else None],
-                    "ln": [hash_sha256(event.name.split()[-1]) if event.name else None],
+                    "fn": [hash_sha256(first_name)],
+                    "ln": [hash_sha256(last_name)],
                     "client_ip_address": client_ip,
-                    "client_user_agent": user_agent
+                    "client_user_agent": user_agent,
+                    "fbc": event.utm_campaign,
+                    "fbp": event.utm_source
+                },
+                "custom_data": {
+                    "utm_medium": event.utm_medium,
+                    "utm_term": event.utm_term,
+                    "utm_content": event.utm_content
                 }
             }
         ]
@@ -59,6 +73,7 @@ async def receive_event(event: EventData, request: Request):
 
     url = f"https://graph.facebook.com/v18.0/{PIXEL_ID}/events?access_token={ACCESS_TOKEN}"
     response = requests.post(url, json=payload)
+
     return {
         "status": response.status_code,
         "meta_response": response.text
