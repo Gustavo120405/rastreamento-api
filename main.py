@@ -38,23 +38,24 @@ async def receive_event(event: EventData, request: Request):
     client_ip = request.client.host
     user_agent = request.headers.get("user-agent", "")
 
-    payload = {
-        "data": [
-            {
-                "event_name": event.event,
-                "event_time": int(request.scope.get("time", 0)),
-                "action_source": "website",
-                "event_source_url": str(request.url),
-                "user_data": {
-                    "em": [hash_sha256(event.email)],
-                    "fn": [hash_sha256(event.name.split()[0]) if event.name else None],
-                    "ln": [hash_sha256(event.name.split()[-1]) if event.name else None],
-                    "client_ip_address": client_ip,
-                    "client_user_agent": user_agent
-                }
+payload = {
+    "data": [
+        {
+            "event_name": event.event,
+            "event_time": int(time.time()),
+            "action_source": "website",
+            "event_source_url": str(request.url),
+            "user_data": {
+                "em": [hash_sha256(event.email)],
+                "fn": [hash_sha256(event.name.split()[0]) if event.name else None],
+                "ln": [hash_sha256(event.name.split()[-1]) if event.name else None],
+                "client_ip_address": client_ip,
+                "client_user_agent": user_agent
             }
-        ]
-    }
+        }
+    ]
+}
+
 
     url = f"https://graph.facebook.com/v18.0/{PIXEL_ID}/events?access_token={ACCESS_TOKEN}"
     response = requests.post(url, json=payload)
