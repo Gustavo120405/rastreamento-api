@@ -71,6 +71,13 @@ async def receive_event(event: EventData, request: Request):
         ]
     }
 
+    # Exibe tudo nos logs do Render
+    print("Evento recebido:")
+    print("Nome:", event.name)
+    print("Email:", event.email)
+    print("UTMs:", event.utm_source, event.utm_medium, event.utm_campaign, event.utm_term, event.utm_content)
+    print("Payload para Meta:", payload)
+
     url = f"https://graph.facebook.com/v18.0/{PIXEL_ID}/events?access_token={ACCESS_TOKEN}"
     response = requests.post(url, json=payload)
 
