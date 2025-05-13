@@ -20,7 +20,7 @@ app.add_middleware(
 
 # Meta Conversion API
 PIXEL_ID = "1837485547102159"
-ACCESS_TOKEN = "SEU_TOKEN_AQUI"  # Use o seu aqui
+ACCESS_TOKEN = "EAAYhO7ITkRQBOwQdf6B0FONgfHlfoS1cSYbqAkuVVl0badqUqkQy5HO4d3WMywfU5Q8JeKiFTqfWXif11JjkdWEDHXPBBB8JTBS6JAc0NuBUFfuZCJYsUg3PbaPOdgBrn8ZB6zn2ZCg53Hfa1ezHe9Cq8tAtZAoPOyzrkyxK5ZCZBm3ZAU4hBGiWbZAZCf19EPJ3dMgZDZD"
 
 # Armazenamento local
 eventos_recebidos = []
