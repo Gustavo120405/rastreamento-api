@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from typing import Optional
 import requests
 import hashlib
+import pytz
+from datetime import datetime
 import time
 
 app = FastAPI()
@@ -38,12 +40,6 @@ class EventData(BaseModel):
     external_id: Optional[str] = None
     event_source_url: Optional[str] = None
 
-# Hash seguro para e-mail e nome (não vai usar agora, mas deixei)
-def hash_sha256(data: Optional[str]) -> Optional[str]:
-    if data:
-        return hashlib.sha256(data.strip().lower().encode()).hexdigest()
-    return None
-
 # Função de geolocalização por IP
 def get_geolocation(ip: str) -> dict:
     try:
@@ -60,6 +56,7 @@ async def receive_event(event: EventData, request: Request):
     client_ip = request.client.host
     user_agent = request.headers.get("user-agent", "")
     location = get_geolocation(client_ip)
+    hora_brasil = datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%H:%M:%S')
 
     payload = {
         "data": [
@@ -67,7 +64,7 @@ async def receive_event(event: EventData, request: Request):
                 "event_name": event.event,
                 "event_time": int(time.time()),
                 "action_source": "website",
-                "event_source_url": event.event_source_url,  # Corrigido para vir do frontend!
+                "event_source_url": event.event_source_url,
                 "user_data": {
                     "client_ip_address": client_ip,
                     "client_user_agent": user_agent,
@@ -86,20 +83,17 @@ async def receive_event(event: EventData, request: Request):
         ]
     }
 
-    # Print no terminal da Render
     print("Evento recebido:", event.event)
     print("Localização:", location.get("city"), "-", location.get("regionName"), "-", location.get("country"))
     print("Payload:", payload)
 
-    # Envia para Meta
     response = requests.post(
         f"https://graph.facebook.com/v18.0/{PIXEL_ID}/events?access_token={ACCESS_TOKEN}",
         json=payload
     )
 
-    # Salva no painel
     eventos_recebidos.append({
-        "hora": time.strftime("%H:%M:%S"),
+        "hora": hora_brasil,
         "evento": event.event,
         "ip": client_ip,
         "cidade": location.get("city"),
