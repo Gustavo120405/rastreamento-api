@@ -116,8 +116,55 @@ async def receive_event(event: EventData, request: Request):
 # Painel de visualização
 @app.get("/monitor", response_class=HTMLResponse)
 async def painel():
-    html = "<h1>Eventos recebidos</h1><table border=1><tr><th>Hora</th><th>Evento</th><th>IP</th><th>Cidade</th><th>Estado</th><th>País</th><th>UTM Source</th></tr>"
+    html = """
+    <html>
+    <head>
+        <title>Monitor de Eventos</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+            h1 { text-align: center; color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { padding: 12px 15px; border: 1px solid #ccc; text-align: center; }
+            th { background-color: #4CAF50; color: white; position: sticky; top: 0; }
+            tr:nth-child(even) { background-color: #f2f2f2; }
+            tr:hover { background-color: #ddd; }
+            .container { max-width: 1200px; margin: auto; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Eventos Recebidos</h1>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Hora</th>
+                        <th>Evento</th>
+                        <th>IP</th>
+                        <th>Cidade</th>
+                        <th>Estado</th>
+                        <th>País</th>
+                        <th>UTM Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+    """
     for ev in reversed(eventos_recebidos[-50:]):
-        html += f"<tr><td>{ev['hora']}</td><td>{ev['evento']}</td><td>{ev['ip']}</td><td>{ev['cidade']}</td><td>{ev['estado']}</td><td>{ev['pais']}</td><td>{ev['utm_source']}</td></tr>"
-    html += "</table>"
+        html += f"""
+        <tr>
+            <td>{ev['hora']}</td>
+            <td>{ev['evento']}</td>
+            <td>{ev['ip']}</td>
+            <td>{ev['cidade']}</td>
+            <td>{ev['estado']}</td>
+            <td>{ev['pais']}</td>
+            <td>{ev['utm_source']}</td>
+        </tr>
+        """
+    html += """
+                </tbody>
+            </table>
+        </div>
+    </body>
+    </html>
+    """
     return html
