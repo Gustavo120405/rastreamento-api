@@ -28,15 +28,17 @@ eventos_recebidos = []
 # Modelo dos dados recebidos
 class EventData(BaseModel):
     event: str
-    email: Optional[str] = None
-    name: Optional[str] = None
     utm_source: Optional[str] = None
     utm_medium: Optional[str] = None
     utm_campaign: Optional[str] = None
     utm_term: Optional[str] = None
     utm_content: Optional[str] = None
+    fbp: Optional[str] = None
+    fbc: Optional[str] = None
+    external_id: Optional[str] = None
+    event_source_url: Optional[str] = None
 
-# Hash seguro para e-mail e nome
+# Hash seguro para e-mail e nome (não vai usar agora, mas deixei)
 def hash_sha256(data: Optional[str]) -> Optional[str]:
     if data:
         return hashlib.sha256(data.strip().lower().encode()).hexdigest()
@@ -57,8 +59,6 @@ def get_geolocation(ip: str) -> dict:
 async def receive_event(event: EventData, request: Request):
     client_ip = request.client.host
     user_agent = request.headers.get("user-agent", "")
-    first_name = event.name.split()[0] if event.name else None
-    last_name = event.name.split()[-1] if event.name else None
     location = get_geolocation(client_ip)
 
     payload = {
@@ -67,18 +67,18 @@ async def receive_event(event: EventData, request: Request):
                 "event_name": event.event,
                 "event_time": int(time.time()),
                 "action_source": "website",
-                "event_source_url": str(request.url),
+                "event_source_url": event.event_source_url,  # Corrigido para vir do frontend!
                 "user_data": {
-                    "em": [hash_sha256(event.email)],
-                    "fn": [hash_sha256(first_name)],
-                    "ln": [hash_sha256(last_name)],
                     "client_ip_address": client_ip,
                     "client_user_agent": user_agent,
-                    "fbc": event.utm_campaign,
-                    "fbp": event.utm_source
+                    "fbp": event.fbp,
+                    "fbc": event.fbc,
+                    "external_id": event.external_id
                 },
                 "custom_data": {
+                    "utm_source": event.utm_source,
                     "utm_medium": event.utm_medium,
+                    "utm_campaign": event.utm_campaign,
                     "utm_term": event.utm_term,
                     "utm_content": event.utm_content
                 }
@@ -101,13 +101,11 @@ async def receive_event(event: EventData, request: Request):
     eventos_recebidos.append({
         "hora": time.strftime("%H:%M:%S"),
         "evento": event.event,
-        "nome": event.name,
-        "email": event.email,
         "ip": client_ip,
         "cidade": location.get("city"),
         "estado": location.get("regionName"),
         "pais": location.get("country"),
-        "utm": event.utm_source
+        "utm_source": event.utm_source
     })
 
     return {
@@ -118,8 +116,8 @@ async def receive_event(event: EventData, request: Request):
 # Painel de visualização
 @app.get("/monitor", response_class=HTMLResponse)
 async def painel():
-    html = "<h1>Eventos recebidos</h1><table border=1><tr><th>Hora</th><th>Evento</th><th>Nome</th><th>Email</th><th>IP</th><th>Cidade</th><th>Estado</th><th>País</th><th>UTM</th></tr>"
+    html = "<h1>Eventos recebidos</h1><table border=1><tr><th>Hora</th><th>Evento</th><th>IP</th><th>Cidade</th><th>Estado</th><th>País</th><th>UTM Source</th></tr>"
     for ev in reversed(eventos_recebidos[-50:]):
-        html += f"<tr><td>{ev['hora']}</td><td>{ev['evento']}</td><td>{ev['nome']}</td><td>{ev['email']}</td><td>{ev['ip']}</td><td>{ev['cidade']}</td><td>{ev['estado']}</td><td>{ev['pais']}</td><td>{ev['utm']}</td></tr>"
+        html += f"<tr><td>{ev['hora']}</td><td>{ev['evento']}</td><td>{ev['ip']}</td><td>{ev['cidade']}</td><td>{ev['estado']}</td><td>{ev['pais']}</td><td>{ev['utm_source']}</td></tr>"
     html += "</table>"
     return html
