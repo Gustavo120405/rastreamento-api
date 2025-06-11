@@ -107,7 +107,12 @@ async def receive_event(event: EventData, request: Request):
         "meta_response": response.text
     }
 
-# Painel de visualização
+# Novo endpoint para API do painel
+@app.get("/eventos_json")
+async def eventos_json():
+    return list(reversed(eventos_recebidos[-50:]))
+
+# Painel visual com atualização automática
 @app.get("/monitor", response_class=HTMLResponse)
 async def painel():
     html = """
@@ -124,6 +129,29 @@ async def painel():
             tr:hover { background-color: #ddd; }
             .container { max-width: 1200px; margin: auto; }
         </style>
+        <script>
+            async function fetchData() {
+                const response = await fetch('/eventos_json');
+                const data = await response.json();
+                const tbody = document.querySelector('tbody');
+                tbody.innerHTML = '';
+                data.forEach(ev => {
+                    const row = `<tr>
+                        <td>${ev.hora}</td>
+                        <td>${ev.evento}</td>
+                        <td>${ev.ip}</td>
+                        <td>${ev.cidade}</td>
+                        <td>${ev.estado}</td>
+                        <td>${ev.pais}</td>
+                        <td>${ev.utm_source}</td>
+                    </tr>`;
+                    tbody.innerHTML += row;
+                });
+            }
+
+            setInterval(fetchData, 10000); // Atualiza a cada 10 segundos
+            window.onload = fetchData; // Atualiza ao carregar
+        </script>
     </head>
     <body>
         <div class="container">
@@ -141,20 +169,6 @@ async def painel():
                     </tr>
                 </thead>
                 <tbody>
-    """
-    for ev in reversed(eventos_recebidos[-50:]):
-        html += f"""
-        <tr>
-            <td>{ev['hora']}</td>
-            <td>{ev['evento']}</td>
-            <td>{ev['ip']}</td>
-            <td>{ev['cidade']}</td>
-            <td>{ev['estado']}</td>
-            <td>{ev['pais']}</td>
-            <td>{ev['utm_source']}</td>
-        </tr>
-        """
-    html += """
                 </tbody>
             </table>
         </div>
