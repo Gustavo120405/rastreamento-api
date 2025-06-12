@@ -106,7 +106,7 @@ async def receive_event(event: EventData, request: Request):
 
     # Salva no painel
     eventos_recebidos.append({
-        ="hora": time.strftime("%H:%M:%S", time.localtime(time.time() - 3 * 3600)),
+        "hora": time.strftime("%H:%M:%S", time.localtime(time.time() - 3 * 3600)),
         "evento": event.event,
         "nome": event.name,
         "email": event.email,
