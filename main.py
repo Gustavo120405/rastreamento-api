@@ -6,6 +6,7 @@ from typing import Optional
 import requests
 import hashlib
 import time
+import pytz
 
 app = FastAPI()
 
@@ -93,20 +94,18 @@ async def receive_event(event: EventData, request: Request):
         ]
     }
 
-    # Print no terminal da Render
     print("Evento recebido:", event.event)
     print("Localização:", location.get("city"), "-", location.get("regionName"), "-", location.get("country"))
     print("Payload:", payload)
 
-    # Envia para Meta
     response = requests.post(
         f"https://graph.facebook.com/v18.0/{PIXEL_ID}/events?access_token={ACCESS_TOKEN}",
         json=payload
     )
 
-    # Salva no painel
+    hora_brasil = time.strftime("%H:%M:%S", time.gmtime(time.time() - 3 * 3600))
     eventos_recebidos.append({
-        "hora": time.strftime("%H:%M:%S", time.localtime(time.time() - 3 * 3600)),
+        "hora": hora_brasil,
         "evento": event.event,
         "nome": event.name,
         "email": event.email,
