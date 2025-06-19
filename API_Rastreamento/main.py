@@ -5,8 +5,6 @@ from pydantic import BaseModel
 from typing import Optional
 import requests
 import hashlib
-import pytz
-from datetime import datetime
 import time
 
 app = FastAPI()
@@ -30,15 +28,26 @@ eventos_recebidos = []
 # Modelo dos dados recebidos
 class EventData(BaseModel):
     event: str
+    email: Optional[str] = None
+    name: Optional[str] = None
     utm_source: Optional[str] = None
     utm_medium: Optional[str] = None
     utm_campaign: Optional[str] = None
     utm_term: Optional[str] = None
     utm_content: Optional[str] = None
+    referrer: Optional[str] = None
+    page_url: Optional[str] = None
+    user_agent: Optional[str] = None
+    language: Optional[str] = None
+    screen_width: Optional[int] = None
     fbp: Optional[str] = None
     fbc: Optional[str] = None
-    external_id: Optional[str] = None
-    event_source_url: Optional[str] = None
+
+# Hash seguro para e-mail e nome
+def hash_sha256(data: Optional[str]) -> Optional[str]:
+    if data:
+        return hashlib.sha256(data.strip().lower().encode()).hexdigest()
+    return None
 
 # Função de geolocalização por IP
 def get_geolocation(ip: str) -> dict:
@@ -54,9 +63,10 @@ def get_geolocation(ip: str) -> dict:
 @app.post("/event")
 async def receive_event(event: EventData, request: Request):
     client_ip = request.client.host
-    user_agent = request.headers.get("user-agent", "")
+    user_agent = event.user_agent or request.headers.get("user-agent", "")
+    first_name = event.name.split()[0] if event.name else None
+    last_name = event.name.split()[-1] if event.name else None
     location = get_geolocation(client_ip)
-    hora_brasil = datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%H:%M:%S')
 
     payload = {
         "data": [
@@ -64,18 +74,18 @@ async def receive_event(event: EventData, request: Request):
                 "event_name": event.event,
                 "event_time": int(time.time()),
                 "action_source": "website",
-                "event_source_url": event.event_source_url,
+                "event_source_url": event.page_url,
                 "user_data": {
+                    "em": [hash_sha256(event.email)],
+                    "fn": [hash_sha256(first_name)],
+                    "ln": [hash_sha256(last_name)],
                     "client_ip_address": client_ip,
                     "client_user_agent": user_agent,
-                    "fbp": event.fbp,
                     "fbc": event.fbc,
-                    "external_id": event.external_id
+                    "fbp": event.fbp
                 },
                 "custom_data": {
-                    "utm_source": event.utm_source,
                     "utm_medium": event.utm_medium,
-                    "utm_campaign": event.utm_campaign,
                     "utm_term": event.utm_term,
                     "utm_content": event.utm_content
                 }
@@ -83,23 +93,28 @@ async def receive_event(event: EventData, request: Request):
         ]
     }
 
+    # Print no terminal da Render
     print("Evento recebido:", event.event)
     print("Localização:", location.get("city"), "-", location.get("regionName"), "-", location.get("country"))
     print("Payload:", payload)
 
+    # Envia para Meta
     response = requests.post(
         f"https://graph.facebook.com/v18.0/{PIXEL_ID}/events?access_token={ACCESS_TOKEN}",
         json=payload
     )
 
+    # Salva no painel
     eventos_recebidos.append({
-        "hora": hora_brasil,
+        "hora": time.strftime("%H:%M:%S", time.localtime(time.time() - 3 * 3600)),
         "evento": event.event,
+        "nome": event.name,
+        "email": event.email,
         "ip": client_ip,
         "cidade": location.get("city"),
         "estado": location.get("regionName"),
         "pais": location.get("country"),
-        "utm_source": event.utm_source
+        "utm": event.utm_source
     })
 
     return {
@@ -107,72 +122,28 @@ async def receive_event(event: EventData, request: Request):
         "meta_response": response.text
     }
 
-# Novo endpoint para API do painel
-@app.get("/eventos_json")
-async def eventos_json():
-    return list(reversed(eventos_recebidos[-50:]))
-
-# Painel visual com atualização automática
+# Painel de visualização
 @app.get("/monitor", response_class=HTMLResponse)
 async def painel():
     html = """
     <html>
     <head>
-        <title>Monitor de Eventos</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
-            h1 { text-align: center; color: #333; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { padding: 12px 15px; border: 1px solid #ccc; text-align: center; }
-            th { background-color: #4CAF50; color: white; position: sticky; top: 0; }
-            tr:nth-child(even) { background-color: #f2f2f2; }
-            tr:hover { background-color: #ddd; }
-            .container { max-width: 1200px; margin: auto; }
-        </style>
-        <script>
-            async function fetchData() {
-                const response = await fetch('/eventos_json');
-                const data = await response.json();
-                const tbody = document.querySelector('tbody');
-                tbody.innerHTML = '';
-                data.forEach(ev => {
-                    const row = `<tr>
-                        <td>${ev.hora}</td>
-                        <td>${ev.evento}</td>
-                        <td>${ev.ip}</td>
-                        <td>${ev.cidade}</td>
-                        <td>${ev.estado}</td>
-                        <td>${ev.pais}</td>
-                        <td>${ev.utm_source}</td>
-                    </tr>`;
-                    tbody.innerHTML += row;
-                });
-            }
-
-            setInterval(fetchData, 10000); // Atualiza a cada 10 segundos
-            window.onload = fetchData; // Atualiza ao carregar
-        </script>
+    <meta http-equiv=\"refresh\" content=\"5\">
+    <style>
+        body { font-family: Arial; background-color: #f2f2f5; padding: 20px; }
+        h1 { color: #333; }
+        table { border-collapse: collapse; width: 100%; background: white; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
     </head>
     <body>
-        <div class="container">
-            <h1>Eventos Recebidos</h1>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Hora</th>
-                        <th>Evento</th>
-                        <th>IP</th>
-                        <th>Cidade</th>
-                        <th>Estado</th>
-                        <th>País</th>
-                        <th>UTM Source</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-        </div>
-    </body>
-    </html>
+    <h1>Eventos Recebidos</h1>
+    <table>
+        <tr><th>Hora</th><th>Evento</th><th>IP</th><th>Cidade</th><th>Estado</th><th>País</th><th>UTM Source</th></tr>
     """
+    for ev in reversed(eventos_recebidos[-50:]):
+        html += f"<tr><td>{ev['hora']}</td><td>{ev['evento']}</td><td>{ev['ip']}</td><td>{ev['cidade']}</td><td>{ev['estado']}</td><td>{ev['pais']}</td><td>{ev['utm']}</td></tr>"
+    html += """</table></body></html>"""
     return html
