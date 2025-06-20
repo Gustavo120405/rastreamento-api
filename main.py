@@ -64,7 +64,7 @@ def get_geolocation(ip: str) -> dict:
 # Endpoint de rastreamento
 @app.post("/event")
 async def receive_event(event: EventData, request: Request):
-    client_ip = request.client.host
+    client_ip = request.headers.get("x-forwarded-for", request.client.host)
     user_agent = event.user_agent or request.headers.get("user-agent", "")
     first_name = event.name.split()[0] if event.name else None
     last_name = event.name.split()[-1] if event.name else None
@@ -106,12 +106,10 @@ async def receive_event(event: EventData, request: Request):
         json=payload
     )
 
-    # Horário com timezone de Brasília
-    hora_brasilia = datetime.now(pytz.timezone("America/Sao_Paulo")).strftime("%H:%M:%S")
-
     # Salva no painel
+    hora_brasil = datetime.now(pytz.timezone("America/Sao_Paulo")).strftime("%H:%M:%S")
     eventos_recebidos.append({
-        "hora": hora_brasilia,
+        "hora": hora_brasil,
         "evento": event.event,
         "nome": event.name,
         "email": event.email,
@@ -128,12 +126,12 @@ async def receive_event(event: EventData, request: Request):
     }
 
 # Painel de visualização
-@app.get("/monitor", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 async def painel():
     html = """
     <html>
     <head>
-    <meta http-equiv="refresh" content="5">
+    <meta http-equiv='refresh' content='5'>
     <style>
         body { font-family: Arial; background-color: #f2f2f5; padding: 20px; }
         h1 { color: #333; }
@@ -146,9 +144,9 @@ async def painel():
     <body>
     <h1>Eventos Recebidos</h1>
     <table>
-        <tr><th>Hora</th><th>Evento</th><th>IP</th><th>Cidade</th><th>Estado</th><th>País</th><th>UTM Source</th></tr>
+        <tr><th>Hora</th><th>Evento</th><th>Nome</th><th>Email</th><th>IP</th><th>Cidade</th><th>Estado</th><th>País</th><th>UTM</th></tr>
     """
     for ev in reversed(eventos_recebidos[-50:]):
-        html += f"<tr><td>{ev['hora']}</td><td>{ev['evento']}</td><td>{ev['ip']}</td><td>{ev['cidade']}</td><td>{ev['estado']}</td><td>{ev['pais']}</td><td>{ev['utm']}</td></tr>"
+        html += f"<tr><td>{ev['hora']}</td><td>{ev['evento']}</td><td>{ev['nome']}</td><td>{ev['email']}</td><td>{ev['ip']}</td><td>{ev['cidade']}</td><td>{ev['estado']}</td><td>{ev['pais']}</td><td>{ev['utm']}</td></tr>"
     html += """</table></body></html>"""
     return html
