@@ -20,7 +20,7 @@ app.add_middleware(
 
 # Meta Conversion API
 PIXEL_ID = "1837485547102159"
-ACCESS_TOKEN = "EAAYhO7ITkRQBO..."  # (chave truncada por segurança)
+ACCESS_TOKEN = "EAAYhO7ITkRQBOwQdf6B0FONgfHlfoS1cSYbqAkuVVl0badqUqkQy5HO4d3WMywfU5Q8JeKiFTqfWXif11JjkdWEDHXPBBB8JTBS6JAc0NuBUFfuZCJYsUg3PbaPOdgBrn8ZB6zn2ZCg53Hfa1ezHe9Cq8tAtZAoPOyzrkyxK5ZCZBm3ZAU4hBGiWbZAZCf19EPJ3dMgZDZD"
 
 # Armazenamento local
 eventos_recebidos = []
@@ -30,6 +30,7 @@ class EventData(BaseModel):
     event: str
     email: Optional[str] = None
     name: Optional[str] = None
+    phone: Optional[str] = None
     utm_source: Optional[str] = None
     utm_medium: Optional[str] = None
     utm_campaign: Optional[str] = None
@@ -43,7 +44,8 @@ class EventData(BaseModel):
     fbp: Optional[str] = None
     fbc: Optional[str] = None
 
-# Hash seguro para e-mail e nome
+# Hash seguro para e-mail, nome, telefone
+
 def hash_sha256(data: Optional[str]) -> Optional[str]:
     if data:
         return hashlib.sha256(data.strip().lower().encode()).hexdigest()
@@ -57,20 +59,31 @@ def get_geolocation(ip: str) -> dict:
             return res.json()
     except:
         pass
-    return {"city": None, "regionName": None, "country": None}
+    return {}
 
 # Endpoint de rastreamento
 @app.post("/event")
 async def receive_event(event: EventData, request: Request):
-    if event.event != "produto_acessado":
-        return {"status": "ignorado", "motivo": "evento não é produto_acessado"}
-
     client_ip = request.client.host
     user_agent = event.user_agent or request.headers.get("user-agent", "")
     first_name = event.name.split()[0] if event.name else None
     last_name = event.name.split()[-1] if event.name else None
     location = get_geolocation(client_ip)
 
+    user_data = {
+        "em": [hash_sha256(event.email)] if event.email else [],
+        "fn": [hash_sha256(first_name)] if first_name else [],
+        "ln": [hash_sha256(last_name)] if last_name else [],
+        "ph": [hash_sha256(event.phone)] if event.phone else [],
+        "client_ip_address": client_ip,
+        "client_user_agent": user_agent,
+        "fbc": event.fbc,
+        "fbp": event.fbp,
+        "ct": location.get("city"),
+        "st": location.get("regionName"),
+        "country": location.get("country")
+    }
+    
     payload = {
         "data": [
             {
@@ -78,15 +91,7 @@ async def receive_event(event: EventData, request: Request):
                 "event_time": int(time.time()),
                 "action_source": "website",
                 "event_source_url": event.page_url,
-                "user_data": {
-                    "em": [hash_sha256(event.email)],
-                    "fn": [hash_sha256(first_name)],
-                    "ln": [hash_sha256(last_name)],
-                    "client_ip_address": client_ip,
-                    "client_user_agent": user_agent,
-                    "fbc": event.fbc,
-                    "fbp": event.fbp
-                },
+                "user_data": user_data,
                 "custom_data": {
                     "utm_medium": event.utm_medium,
                     "utm_term": event.utm_term,
@@ -96,13 +101,15 @@ async def receive_event(event: EventData, request: Request):
         ]
     }
 
-    # Envia para Meta
+    print("Evento recebido:", event.event)
+    print("Localização:", location.get("city"), "-", location.get("regionName"), "-", location.get("country"))
+    print("Payload:", payload)
+
     response = requests.post(
         f"https://graph.facebook.com/v18.0/{PIXEL_ID}/events?access_token={ACCESS_TOKEN}",
         json=payload
     )
 
-    # Salva no painel
     eventos_recebidos.append({
         "hora": time.strftime("%H:%M:%S", time.localtime(time.time() - 3 * 3600)),
         "evento": event.event,
@@ -115,7 +122,10 @@ async def receive_event(event: EventData, request: Request):
         "utm": event.utm_source
     })
 
-    return {"status": response.status_code, "meta_response": response.text}
+    return {
+        "status": response.status_code,
+        "meta_response": response.text
+    }
 
 # Painel de visualização
 @app.get("/monitor", response_class=HTMLResponse)
